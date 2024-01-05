@@ -3,11 +3,6 @@ package skiplist
 import "golang.org/x/exp/constraints"
 
 type (
-	node[O constraints.Ordered, T any] struct {
-		*KvPair[O, T]
-		nextNodes []*node[O, T]
-	}
-
 	KvPair[O constraints.Ordered, T any] struct {
 		key O
 		val T

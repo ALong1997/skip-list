@@ -11,14 +11,20 @@ import (
 type (
 	// SkipList is not thread-safe.
 	SkipList[O constraints.Ordered, T any] struct {
-		level, cap, maxLevel int
-		head                 *node[O, T]
-		r                    *rand.Rand
-		nodeCache            sync.Pool
+		level, maxLevel uint8
+		cap             int
+		head            *node[O, T]
+		r               *rand.Rand
+		nodeCache       sync.Pool
+	}
+
+	node[O constraints.Ordered, T any] struct {
+		*KvPair[O, T]
+		nextNodes []*node[O, T]
 	}
 )
 
-func NewSkipList[O constraints.Ordered, T any](maxLevel int) *SkipList[O, T] {
+func NewSkipList[O constraints.Ordered, T any](maxLevel uint8) *SkipList[O, T] {
 	if maxLevel <= 0 {
 		return nil
 	}
@@ -33,7 +39,7 @@ func NewSkipList[O constraints.Ordered, T any](maxLevel int) *SkipList[O, T] {
 	}
 }
 
-func (sl *SkipList[O, T]) Level() int {
+func (sl *SkipList[O, T]) Level() uint8 {
 	return sl.level
 }
 
@@ -127,7 +133,7 @@ func (sl *SkipList[O, T]) Del(key O) {
 	sl.nodeCache.Put(deleteNode)
 
 	// cut
-	var dif int
+	var dif uint8
 	for l := sl.Level() - 1; l >= 0; l-- {
 		if sl.head.nextNodes[l] != nil {
 			break
@@ -254,8 +260,8 @@ func (sl *SkipList[O, T]) floor(target O) *node[O, T] {
 	return current
 }
 
-func (sl *SkipList[O, T]) randLevel() int {
-	var randL int
+func (sl *SkipList[O, T]) randLevel() uint8 {
+	var randL uint8
 	for rand.Intn(2) == 0 && randL < sl.maxLevel {
 		randL++
 	}
