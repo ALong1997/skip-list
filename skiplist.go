@@ -68,16 +68,16 @@ func (sl *SkipList[O, T]) Put(key O, val T) {
 
 	n = newNode(key, val, make([]*node[O, T], randL+1))
 
-	head := sl.head
-	for l := len(head.nextNodes) - 1; l >= 0; l-- {
-		for head.nextNodes[l] != nil && head.key < key {
+	current := sl.head
+	for l := len(current.nextNodes) - 1; l >= 0; l-- {
+		for current.nextNodes[l] != nil && current.key < key {
 			// search to the right
-			head = head.nextNodes[l]
+			current = current.nextNodes[l]
 		}
 
 		// insert
-		n.nextNodes[l] = head.nextNodes[l]
-		head.nextNodes[l] = n
+		n.nextNodes[l] = current.nextNodes[l]
+		current.nextNodes[l] = n
 
 		// search down
 	}
@@ -94,16 +94,16 @@ func (sl *SkipList[O, T]) Del(key O) {
 		return
 	}
 
-	head := sl.head
-	for l := len(head.nextNodes) - 1; l >= 0; l-- {
-		for head.nextNodes[l] != nil && head.nextNodes[l].key < key {
+	current := sl.head
+	for l := len(current.nextNodes) - 1; l >= 0; l-- {
+		for current.nextNodes[l] != nil && current.nextNodes[l].key < key {
 			// search to the right
-			head = head.nextNodes[l]
+			current = current.nextNodes[l]
 		}
 
-		if head.nextNodes[l] != nil && head.nextNodes[l].key == key {
+		if current.nextNodes[l] != nil && current.nextNodes[l].key == key {
 			// delete
-			head.nextNodes[l] = head.nextNodes[l].nextNodes[l]
+			current.nextNodes[l] = current.nextNodes[l].nextNodes[l]
 		}
 
 		// search down
@@ -170,16 +170,16 @@ func (sl *SkipList[O, T]) get(key O) *node[O, T] {
 		return nil
 	}
 
-	head := sl.head
-	for l := len(head.nextNodes) - 1; l >= 0; l-- {
-		for head.nextNodes[l] != nil && head.nextNodes[l].key < key {
+	current := sl.head
+	for l := len(current.nextNodes) - 1; l >= 0; l-- {
+		for current.nextNodes[l] != nil && current.nextNodes[l].key < key {
 			// search to the right
-			head = head.nextNodes[l]
+			current = current.nextNodes[l]
 		}
 
-		if head.nextNodes[l] != nil && head.nextNodes[l].key == key {
+		if current.nextNodes[l] != nil && current.nextNodes[l].key == key {
 			// exist
-			return head.nextNodes[l]
+			return current.nextNodes[l]
 		}
 
 		// search down
@@ -193,22 +193,22 @@ func (sl *SkipList[O, T]) ceil(target O) *node[O, T] {
 		return nil
 	}
 
-	head := sl.head
-	for l := len(head.nextNodes) - 1; l >= 0; l-- {
-		for head.nextNodes[l] != nil && head.nextNodes[l].key < target {
+	current := sl.head
+	for l := len(current.nextNodes) - 1; l >= 0; l-- {
+		for current.nextNodes[l] != nil && current.nextNodes[l].key < target {
 			// search to the right
-			head = head.nextNodes[l]
+			current = current.nextNodes[l]
 		}
 
-		if head.nextNodes[l] != nil && head.nextNodes[l].key == target {
+		if current.nextNodes[l] != nil && current.nextNodes[l].key == target {
 			// equal
-			return head.nextNodes[l]
+			return current.nextNodes[l]
 		}
 
 		// search down
 	}
-	// head.nextNodes[0] is ceil || head.nextNodes[0] == nil(ceil is not exist)
-	return head.nextNodes[0]
+	// current.nextNodes[0] is ceil || current.nextNodes[0] == nil(tail node means ceil is not exist)
+	return current.nextNodes[0]
 }
 
 func (sl *SkipList[O, T]) floor(target O) *node[O, T] {
@@ -216,22 +216,22 @@ func (sl *SkipList[O, T]) floor(target O) *node[O, T] {
 		return nil
 	}
 
-	head := sl.head
-	for l := len(head.nextNodes) - 1; l >= 0; l-- {
-		for head.nextNodes[l] != nil && head.nextNodes[l].key < target {
+	current := sl.head
+	for l := len(current.nextNodes) - 1; l >= 0; l-- {
+		for current.nextNodes[l] != nil && current.nextNodes[l].key < target {
 			// search to the right
-			head = head.nextNodes[l]
+			current = current.nextNodes[l]
 		}
 
-		if head.nextNodes[l] != nil && head.nextNodes[l].key == target {
+		if current.nextNodes[l] != nil && current.nextNodes[l].key == target {
 			// equal
-			return head.nextNodes[l]
+			return current.nextNodes[l]
 		}
 
 		// search down
 	}
-	// head is floor || head == sl.head.nextNodes[0](floor is not exist)
-	return head
+	// current is floor || current == sl.current.nextNodes[0](head node means floor is not exist)
+	return current
 }
 
 func (sl *SkipList[O, T]) randLevel() int {
