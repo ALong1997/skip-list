@@ -73,10 +73,7 @@ func (sl *SkipList[O, T]) Put(key O, val T) {
 	var randL = sl.randLevel()
 
 	// grow
-	if sl.Level() < randL+1 {
-		sl.head.nextNodes = append(sl.head.nextNodes, make([]*node[O, T], randL+1-sl.Level())...)
-		sl.level = randL + 1
-	}
+	sl.grow(randL + 1)
 
 	// new node
 	n, _ = sl.nodeCache.Get().(*node[O, T])
@@ -100,7 +97,7 @@ func (sl *SkipList[O, T]) Put(key O, val T) {
 	sl.cap++
 }
 
-func (sl *SkipList[O, T]) Del(key O) {
+func (sl *SkipList[O, T]) Delete(key O) {
 	if sl.Level() == 0 {
 		return
 	}
@@ -132,16 +129,8 @@ func (sl *SkipList[O, T]) Del(key O) {
 	sl.nodeCache.Put(deleteNode)
 
 	// cut
-	var dif uint32
-	for l := sl.Level() - 1; l >= 0; l-- {
-		if sl.head.nextNodes[l] != nil {
-			break
-		}
-		dif++
-	}
-	sl.head.nextNodes = sl.head.nextNodes[:sl.Level()-dif]
+	sl.cut()
 
-	sl.level -= dif
 	sl.cap--
 }
 
@@ -265,4 +254,24 @@ func (sl *SkipList[O, T]) randLevel() uint32 {
 		randL++
 	}
 	return randL
+}
+
+func (sl *SkipList[O, T]) grow(newL uint32) {
+	if sl.Level() < newL {
+		sl.head.nextNodes = append(sl.head.nextNodes, make([]*node[O, T], newL-sl.Level())...)
+		sl.level = newL
+	}
+}
+
+func (sl *SkipList[O, T]) cut() {
+	var dif uint32
+	for l := sl.Level() - 1; l > 0; l-- {
+		if sl.head.nextNodes[l] != nil {
+			break
+		}
+		dif++
+	}
+	sl.head.nextNodes = sl.head.nextNodes[:sl.Level()-dif]
+
+	sl.level -= dif
 }
