@@ -28,10 +28,3 @@ func newKvPair[O constraints.Ordered, T any](key O, val T) *KvPair[O, T] {
 		val: val,
 	}
 }
-
-func newNode[O constraints.Ordered, T any](key O, val T, nextNodes []*node[O, T]) *node[O, T] {
-	return &node[O, T]{
-		KvPair:    newKvPair(key, val),
-		nextNodes: nextNodes,
-	}
-}
