@@ -2,16 +2,19 @@ package skiplist
 
 import (
 	"math/rand"
+	"sync"
 	"time"
 
 	"golang.org/x/exp/constraints"
 )
 
 type (
+	// SkipList is not thread-safe.
 	SkipList[O constraints.Ordered, T any] struct {
 		level, cap, maxLevel int
 		head                 *node[O, T]
 		r                    *rand.Rand
+		nodeCache            sync.Pool
 	}
 )
 
@@ -21,11 +24,12 @@ func NewSkipList[O constraints.Ordered, T any](maxLevel int) *SkipList[O, T] {
 	}
 
 	return &SkipList[O, T]{
-		level:    1,
-		cap:      0,
-		maxLevel: maxLevel,
-		head:     newNode(nil, nil, make([]*node[O, T], 1)),
-		r:        rand.New(rand.NewSource(time.Now().Unix())),
+		level:     1,
+		cap:       0,
+		maxLevel:  maxLevel,
+		head:      &node[O, T]{nextNodes: make([]*node[O, T], 1)},
+		r:         rand.New(rand.NewSource(time.Now().Unix())),
+		nodeCache: sync.Pool{New: func() any { return &node[O, T]{} }},
 	}
 }
 
@@ -69,7 +73,11 @@ func (sl *SkipList[O, T]) Put(key O, val T) {
 		sl.level = randL + 1
 	}
 
-	n = newNode(key, val, make([]*node[O, T], randL+1))
+	// new node
+	n, _ = sl.nodeCache.Get().(*node[O, T])
+	n.KvPair = newKvPair(key, val)
+	n.nextNodes = make([]*node[O, T], randL+1)
+
 	current := sl.head
 	for l := len(current.nextNodes) - 1; l >= 0; l-- {
 		for current.nextNodes[l] != nil && current.key < key {
@@ -92,12 +100,7 @@ func (sl *SkipList[O, T]) Del(key O) {
 		return
 	}
 
-	n := sl.get(key)
-	if n != nil {
-		// not exist
-		return
-	}
-
+	var deleteNode *node[O, T]
 	current := sl.head
 	for l := len(current.nextNodes) - 1; l >= 0; l-- {
 		for current.nextNodes[l] != nil && current.nextNodes[l].key < key {
@@ -107,11 +110,21 @@ func (sl *SkipList[O, T]) Del(key O) {
 
 		if current.nextNodes[l] != nil && current.nextNodes[l].key == key {
 			// delete
+			if deleteNode == nil {
+				deleteNode = current.nextNodes[l]
+			}
 			current.nextNodes[l] = current.nextNodes[l].nextNodes[l]
 		}
 
 		// search down
 	}
+
+	if deleteNode == nil {
+		// not exist
+		return
+	}
+	deleteNode.nextNodes = nil
+	sl.nodeCache.Put(deleteNode)
 
 	// cut
 	var dif int
