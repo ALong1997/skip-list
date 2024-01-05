@@ -9,9 +9,9 @@ import (
 
 type (
 	SkipList[O constraints.Ordered, T any] struct {
-		maxLevel int
-		head     *node[O, T]
-		r        *rand.Rand
+		level, cap, maxLevel int
+		head                 *node[O, T]
+		r                    *rand.Rand
 	}
 )
 
@@ -21,18 +21,20 @@ func NewSkipList[O constraints.Ordered, T any](maxLevel int) *SkipList[O, T] {
 	}
 
 	return &SkipList[O, T]{
-		head:     newNode(nil, nil, make([]*node[O, T], 1)),
+		level:    1,
+		cap:      0,
 		maxLevel: maxLevel,
+		head:     newNode(nil, nil, make([]*node[O, T], 1)),
 		r:        rand.New(rand.NewSource(time.Now().Unix())),
 	}
 }
 
-// Level returns level of the *SkipList.
 func (sl *SkipList[O, T]) Level() int {
-	if sl.head == nil || sl.head.nextNodes == nil {
-		return 0
-	}
-	return len(sl.head.nextNodes)
+	return sl.level
+}
+
+func (sl *SkipList[O, T]) Cap() int {
+	return sl.cap
 }
 
 func (sl *SkipList[O, T]) Get(key O) (val T, exist bool) {
@@ -62,12 +64,12 @@ func (sl *SkipList[O, T]) Put(key O, val T) {
 	var randL = sl.randLevel()
 
 	// grow
-	for sl.Level()-1 < randL {
-		sl.head.nextNodes = append(sl.head.nextNodes, nil)
+	if sl.Level() < randL+1 {
+		sl.head.nextNodes = append(sl.head.nextNodes, make([]*node[O, T], randL+1-sl.Level())...)
+		sl.level = randL + 1
 	}
 
 	n = newNode(key, val, make([]*node[O, T], randL+1))
-
 	current := sl.head
 	for l := len(current.nextNodes) - 1; l >= 0; l-- {
 		for current.nextNodes[l] != nil && current.key < key {
@@ -81,6 +83,8 @@ func (sl *SkipList[O, T]) Put(key O, val T) {
 
 		// search down
 	}
+
+	sl.cap++
 }
 
 func (sl *SkipList[O, T]) Del(key O) {
@@ -118,6 +122,9 @@ func (sl *SkipList[O, T]) Del(key O) {
 		dif++
 	}
 	sl.head.nextNodes = sl.head.nextNodes[:sl.Level()-dif]
+
+	sl.level -= dif
+	sl.cap--
 }
 
 // Range searches the *KvPair of key in [start, end].
