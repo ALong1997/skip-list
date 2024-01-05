@@ -21,7 +21,7 @@ func NewSkipList[O constraints.Ordered, T any](maxLevel int) *SkipList[O, T] {
 	}
 
 	return &SkipList[O, T]{
-		head:     &node[O, T]{},
+		head:     newNode(nil, nil, make([]*node[O, T], 1)),
 		maxLevel: maxLevel,
 		r:        rand.New(rand.NewSource(time.Now().Unix())),
 	}
