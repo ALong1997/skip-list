@@ -3,6 +3,7 @@ package skiplist
 import (
 	"math/rand"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/exp/constraints"
@@ -12,9 +13,19 @@ type (
 	// SkipList is not thread-safe.
 	SkipList[O constraints.Ordered, T any] struct {
 		level, maxLevel, cap uint32
-		head                 *node[O, T]
-		r                    *rand.Rand
-		nodeCache            sync.Pool
+
+		// head node of SkipList
+		head *node[O, T]
+
+		// randomly generate level when inserting a node
+		r *rand.Rand
+
+		// reduce the pressure of GC
+		nodeCache sync.Pool
+
+		// concurrent
+		isConcurrent bool
+		sync.RWMutex
 	}
 
 	node[O constraints.Ordered, T any] struct {
@@ -23,32 +34,38 @@ type (
 	}
 )
 
-func NewSkipList[O constraints.Ordered, T any](maxLevel uint32) *SkipList[O, T] {
+func NewSkipList[O constraints.Ordered, T any](maxLevel uint32, isConcurrent bool) *SkipList[O, T] {
 	if maxLevel <= 0 {
 		return nil
 	}
 
 	return &SkipList[O, T]{
-		level:     1,
-		maxLevel:  maxLevel,
-		cap:       0,
-		head:      &node[O, T]{nextNodes: make([]*node[O, T], 1)},
-		r:         rand.New(rand.NewSource(time.Now().Unix())),
-		nodeCache: sync.Pool{New: func() any { return &node[O, T]{} }},
+		level:        1,
+		maxLevel:     maxLevel,
+		cap:          0,
+		head:         &node[O, T]{nextNodes: make([]*node[O, T], 1)},
+		r:            rand.New(rand.NewSource(time.Now().Unix())),
+		nodeCache:    sync.Pool{New: func() any { return &node[O, T]{} }},
+		isConcurrent: isConcurrent,
 	}
 }
 
 func (sl *SkipList[O, T]) Level() uint32 {
-	return sl.level
+	return atomic.LoadUint32(&sl.level)
 }
 
 func (sl *SkipList[O, T]) Cap() uint32 {
-	return sl.cap
+	return atomic.LoadUint32(&sl.level)
 }
 
 func (sl *SkipList[O, T]) Get(key O) (val T, exist bool) {
 	if sl.Level() == 0 {
 		return
+	}
+
+	if sl.isConcurrent {
+		sl.RLock()
+		defer sl.RUnlock()
 	}
 
 	if n := sl.get(key); n != nil {
@@ -60,6 +77,11 @@ func (sl *SkipList[O, T]) Get(key O) (val T, exist bool) {
 func (sl *SkipList[O, T]) Put(key O, val T) {
 	if sl.Level() == 0 {
 		return
+	}
+
+	if sl.isConcurrent {
+		sl.Lock()
+		defer sl.Unlock()
 	}
 
 	n := sl.get(key)
@@ -94,12 +116,17 @@ func (sl *SkipList[O, T]) Put(key O, val T) {
 		// search down
 	}
 
-	sl.cap++
+	atomic.AddUint32(&sl.cap, 1)
 }
 
 func (sl *SkipList[O, T]) Delete(key O) {
 	if sl.Level() == 0 {
 		return
+	}
+
+	if sl.isConcurrent {
+		sl.Lock()
+		defer sl.Unlock()
 	}
 
 	var deleteNode *node[O, T]
@@ -131,7 +158,7 @@ func (sl *SkipList[O, T]) Delete(key O) {
 	// cut
 	sl.cut()
 
-	sl.cap--
+	atomic.StoreUint32(&sl.cap, sl.Cap()-1)
 }
 
 // Range searches the *KvPair of key in [start, end].
@@ -141,6 +168,11 @@ func (sl *SkipList[O, T]) Range(start, end O) []*KvPair[O, T] {
 	}
 
 	var res = make([]*KvPair[O, T], 0)
+
+	if sl.isConcurrent {
+		sl.RLock()
+		defer sl.RUnlock()
+	}
 
 	// starting point
 	ceilingNode := sl.ceil(start)
@@ -161,6 +193,11 @@ func (sl *SkipList[O, T]) Ceil(target O) (*KvPair[O, T], bool) {
 		return nil, false
 	}
 
+	if sl.isConcurrent {
+		sl.RLock()
+		defer sl.RUnlock()
+	}
+
 	if ceilingNode := sl.ceil(target); ceilingNode != nil {
 		return newKvPair(ceilingNode.key, ceilingNode.val), true
 	}
@@ -171,6 +208,11 @@ func (sl *SkipList[O, T]) Ceil(target O) (*KvPair[O, T], bool) {
 func (sl *SkipList[O, T]) Floor(target O) (*KvPair[O, T], bool) {
 	if sl.Level() == 0 {
 		return nil, false
+	}
+
+	if sl.isConcurrent {
+		sl.RLock()
+		defer sl.RUnlock()
 	}
 
 	if floorNode := sl.floor(target); floorNode != sl.head.nextNodes[0] {
@@ -250,7 +292,7 @@ func (sl *SkipList[O, T]) floor(target O) *node[O, T] {
 
 func (sl *SkipList[O, T]) randLevel() uint32 {
 	var randL uint32
-	for rand.Intn(2) == 0 && randL < sl.maxLevel {
+	for sl.r.Intn(2) == 0 && randL < sl.maxLevel {
 		randL++
 	}
 	return randL
@@ -259,7 +301,7 @@ func (sl *SkipList[O, T]) randLevel() uint32 {
 func (sl *SkipList[O, T]) grow(newL uint32) {
 	if sl.Level() < newL {
 		sl.head.nextNodes = append(sl.head.nextNodes, make([]*node[O, T], newL-sl.Level())...)
-		sl.level = newL
+		atomic.StoreUint32(&sl.level, newL)
 	}
 }
 
@@ -273,5 +315,5 @@ func (sl *SkipList[O, T]) cut() {
 	}
 	sl.head.nextNodes = sl.head.nextNodes[:sl.Level()-dif]
 
-	sl.level -= dif
+	atomic.AddUint32(&sl.level, ^dif+1)
 }
