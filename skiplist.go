@@ -12,7 +12,7 @@ import (
 type (
 	// SkipList is not thread-safe.
 	SkipList[O constraints.Ordered, T any] struct {
-		level, maxLevel, cap uint32
+		level, maxLevel, cap int32
 
 		// head node of SkipList
 		head *node[O, T]
@@ -34,7 +34,7 @@ type (
 	}
 )
 
-func NewSkipList[O constraints.Ordered, T any](maxLevel uint32, isConcurrent bool) *SkipList[O, T] {
+func NewSkipList[O constraints.Ordered, T any](maxLevel int32, isConcurrent bool) *SkipList[O, T] {
 	if maxLevel <= 0 {
 		return nil
 	}
@@ -50,12 +50,18 @@ func NewSkipList[O constraints.Ordered, T any](maxLevel uint32, isConcurrent boo
 	}
 }
 
-func (sl *SkipList[O, T]) Level() uint32 {
-	return atomic.LoadUint32(&sl.level)
+func (sl *SkipList[O, T]) Level() int32 {
+	if sl == nil {
+		return 0
+	}
+	return atomic.LoadInt32(&sl.level)
 }
 
-func (sl *SkipList[O, T]) Cap() uint32 {
-	return atomic.LoadUint32(&sl.level)
+func (sl *SkipList[O, T]) Cap() int32 {
+	if sl == nil {
+		return 0
+	}
+	return atomic.LoadInt32(&sl.cap)
 }
 
 func (sl *SkipList[O, T]) Get(key O) (val T, exist bool) {
@@ -103,20 +109,22 @@ func (sl *SkipList[O, T]) Put(key O, val T) {
 	n.nextNodes = make([]*node[O, T], randL+1)
 
 	current := sl.head
-	for l := len(current.nextNodes) - 1; l >= 0; l-- {
-		for current.nextNodes[l] != nil && current.key < key {
+	for l := sl.Level() - 1; l >= 0; l-- {
+		for current.nextNodes[l] != nil && current.nextNodes[l].key < key {
 			// search to the right
 			current = current.nextNodes[l]
 		}
 
-		// insert
-		n.nextNodes[l] = current.nextNodes[l]
-		current.nextNodes[l] = n
+		if l <= randL {
+			// insert
+			n.nextNodes[l] = current.nextNodes[l]
+			current.nextNodes[l] = n
+		}
 
 		// search down
 	}
 
-	atomic.AddUint32(&sl.cap, 1)
+	atomic.AddInt32(&sl.cap, 1)
 }
 
 func (sl *SkipList[O, T]) Delete(key O) {
@@ -131,7 +139,7 @@ func (sl *SkipList[O, T]) Delete(key O) {
 
 	var deleteNode *node[O, T]
 	current := sl.head
-	for l := len(current.nextNodes) - 1; l >= 0; l-- {
+	for l := sl.Level() - 1; l >= 0; l-- {
 		for current.nextNodes[l] != nil && current.nextNodes[l].key < key {
 			// search to the right
 			current = current.nextNodes[l]
@@ -158,7 +166,7 @@ func (sl *SkipList[O, T]) Delete(key O) {
 	// cut
 	sl.cut()
 
-	atomic.StoreUint32(&sl.cap, sl.Cap()-1)
+	atomic.AddInt32(&sl.cap, -1)
 }
 
 // Range searches the *KvPair of key in [start, end].
@@ -215,7 +223,7 @@ func (sl *SkipList[O, T]) Floor(target O) (*KvPair[O, T], bool) {
 		defer sl.RUnlock()
 	}
 
-	if floorNode := sl.floor(target); floorNode != sl.head.nextNodes[0] {
+	if floorNode := sl.floor(target); floorNode != sl.head {
 		return newKvPair(floorNode.key, floorNode.val), true
 	}
 	return nil, false
@@ -227,7 +235,7 @@ func (sl *SkipList[O, T]) get(key O) *node[O, T] {
 	}
 
 	current := sl.head
-	for l := len(current.nextNodes) - 1; l >= 0; l-- {
+	for l := sl.Level() - 1; l >= 0; l-- {
 		for current.nextNodes[l] != nil && current.nextNodes[l].key < key {
 			// search to the right
 			current = current.nextNodes[l]
@@ -250,7 +258,7 @@ func (sl *SkipList[O, T]) ceil(target O) *node[O, T] {
 	}
 
 	current := sl.head
-	for l := len(current.nextNodes) - 1; l >= 0; l-- {
+	for l := sl.Level() - 1; l >= 0; l-- {
 		for current.nextNodes[l] != nil && current.nextNodes[l].key < target {
 			// search to the right
 			current = current.nextNodes[l]
@@ -273,7 +281,7 @@ func (sl *SkipList[O, T]) floor(target O) *node[O, T] {
 	}
 
 	current := sl.head
-	for l := len(current.nextNodes) - 1; l >= 0; l-- {
+	for l := sl.Level() - 1; l >= 0; l-- {
 		for current.nextNodes[l] != nil && current.nextNodes[l].key < target {
 			// search to the right
 			current = current.nextNodes[l]
@@ -286,27 +294,27 @@ func (sl *SkipList[O, T]) floor(target O) *node[O, T] {
 
 		// search down
 	}
-	// current is floor || current == sl.current.nextNodes[0](head node means floor is not exist)
+	// current is floor || current == sl.head(head node means floor is not exist)
 	return current
 }
 
-func (sl *SkipList[O, T]) randLevel() uint32 {
-	var randL uint32
+func (sl *SkipList[O, T]) randLevel() int32 {
+	var randL int32
 	for sl.r.Intn(2) == 0 && randL < sl.maxLevel {
 		randL++
 	}
 	return randL
 }
 
-func (sl *SkipList[O, T]) grow(newL uint32) {
+func (sl *SkipList[O, T]) grow(newL int32) {
 	if sl.Level() < newL {
 		sl.head.nextNodes = append(sl.head.nextNodes, make([]*node[O, T], newL-sl.Level())...)
-		atomic.StoreUint32(&sl.level, newL)
+		atomic.StoreInt32(&sl.level, newL)
 	}
 }
 
 func (sl *SkipList[O, T]) cut() {
-	var dif uint32
+	var dif int32
 	for l := sl.Level() - 1; l > 0; l-- {
 		if sl.head.nextNodes[l] != nil {
 			break
@@ -315,5 +323,5 @@ func (sl *SkipList[O, T]) cut() {
 	}
 	sl.head.nextNodes = sl.head.nextNodes[:sl.Level()-dif]
 
-	atomic.AddUint32(&sl.level, ^dif+1)
+	atomic.AddInt32(&sl.level, -dif)
 }
