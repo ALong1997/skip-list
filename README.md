@@ -31,8 +31,6 @@ With [Go module](https://github.com/golang/go/wiki/Modules) support, simply add 
 import "github.com/ALong1997/skiplist"
 ```
 
-to your code, and then `go [build|run|test]` will automatically fetch the necessary dependencies.
-
 Otherwise, run the following Go command to install the `skiplist` package:
 
 ```sh
