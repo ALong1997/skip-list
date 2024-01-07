@@ -3,7 +3,6 @@ package skiplist
 import (
 	"math/rand"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"golang.org/x/exp/constraints"
@@ -54,14 +53,14 @@ func (sl *SkipList[O, T]) Level() int32 {
 	if sl == nil {
 		return 0
 	}
-	return atomic.LoadInt32(&sl.level)
+	return sl.level
 }
 
 func (sl *SkipList[O, T]) Cap() int32 {
 	if sl == nil {
 		return 0
 	}
-	return atomic.LoadInt32(&sl.cap)
+	return sl.cap
 }
 
 func (sl *SkipList[O, T]) Get(key O) (val T, exist bool) {
@@ -124,7 +123,7 @@ func (sl *SkipList[O, T]) Put(key O, val T) {
 		// search down
 	}
 
-	atomic.AddInt32(&sl.cap, 1)
+	sl.cap++
 }
 
 func (sl *SkipList[O, T]) Delete(key O) {
@@ -166,7 +165,7 @@ func (sl *SkipList[O, T]) Delete(key O) {
 	// cut
 	sl.cut()
 
-	atomic.AddInt32(&sl.cap, -1)
+	sl.cap--
 }
 
 // Range searches the *KvPair of key in [start, end].
@@ -309,7 +308,7 @@ func (sl *SkipList[O, T]) randLevel() int32 {
 func (sl *SkipList[O, T]) grow(newL int32) {
 	if sl.Level() < newL {
 		sl.head.nextNodes = append(sl.head.nextNodes, make([]*node[O, T], newL-sl.Level())...)
-		atomic.StoreInt32(&sl.level, newL)
+		sl.level = newL
 	}
 }
 
@@ -323,5 +322,5 @@ func (sl *SkipList[O, T]) cut() {
 	}
 	sl.head.nextNodes = sl.head.nextNodes[:sl.Level()-dif]
 
-	atomic.AddInt32(&sl.level, -dif)
+	sl.level -= dif
 }
