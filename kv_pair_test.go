@@ -1,9 +1,9 @@
-package skiplist
+package skip_list
 
 import (
-	"golang.org/x/exp/constraints"
-	"reflect"
-	"testing"
+"golang.org/x/exp/constraints"
+"reflect"
+"testing"
 )
 
 func TestKvPair_Key(t *testing.T) {
