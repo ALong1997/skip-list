@@ -1,4 +1,4 @@
-module github.com/ALong1997/skip_list
+module github.com/ALong1997/skip-list
 
 go 1.20
 
