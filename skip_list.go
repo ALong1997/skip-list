@@ -107,17 +107,17 @@ func (sl *SkipList[O, T]) Put(key O, val T) {
 	n.KvPair = newKvPair(key, val)
 	n.nextNodes = make([]*node[O, T], randL+1)
 
-	current := sl.head
+	move := sl.head
 	for l := sl.Level() - 1; l >= 0; l-- {
-		for current.nextNodes[l] != nil && current.nextNodes[l].key < key {
+		for move.nextNodes[l] != nil && move.nextNodes[l].key < key {
 			// search to the right
-			current = current.nextNodes[l]
+			move = move.nextNodes[l]
 		}
 
 		if l <= randL {
 			// insert
-			n.nextNodes[l] = current.nextNodes[l]
-			current.nextNodes[l] = n
+			n.nextNodes[l] = move.nextNodes[l]
+			move.nextNodes[l] = n
 		}
 
 		// search down
@@ -137,19 +137,19 @@ func (sl *SkipList[O, T]) Delete(key O) {
 	}
 
 	var deleteNode *node[O, T]
-	current := sl.head
+	move := sl.head
 	for l := sl.Level() - 1; l >= 0; l-- {
-		for current.nextNodes[l] != nil && current.nextNodes[l].key < key {
+		for move.nextNodes[l] != nil && move.nextNodes[l].key < key {
 			// search to the right
-			current = current.nextNodes[l]
+			move = move.nextNodes[l]
 		}
 
-		if current.nextNodes[l] != nil && current.nextNodes[l].key == key {
+		if move.nextNodes[l] != nil && move.nextNodes[l].key == key {
 			// delete
 			if deleteNode == nil {
-				deleteNode = current.nextNodes[l]
+				deleteNode = move.nextNodes[l]
 			}
-			current.nextNodes[l] = current.nextNodes[l].nextNodes[l]
+			move.nextNodes[l] = move.nextNodes[l].nextNodes[l]
 		}
 
 		// search down
@@ -233,16 +233,16 @@ func (sl *SkipList[O, T]) get(key O) *node[O, T] {
 		return nil
 	}
 
-	current := sl.head
+	move := sl.head
 	for l := sl.Level() - 1; l >= 0; l-- {
-		for current.nextNodes[l] != nil && current.nextNodes[l].key < key {
+		for move.nextNodes[l] != nil && move.nextNodes[l].key < key {
 			// search to the right
-			current = current.nextNodes[l]
+			move = move.nextNodes[l]
 		}
 
-		if current.nextNodes[l] != nil && current.nextNodes[l].key == key {
+		if move.nextNodes[l] != nil && move.nextNodes[l].key == key {
 			// exist
-			return current.nextNodes[l]
+			return move.nextNodes[l]
 		}
 
 		// search down
@@ -256,22 +256,22 @@ func (sl *SkipList[O, T]) ceil(target O) *node[O, T] {
 		return nil
 	}
 
-	current := sl.head
+	move := sl.head
 	for l := sl.Level() - 1; l >= 0; l-- {
-		for current.nextNodes[l] != nil && current.nextNodes[l].key < target {
+		for move.nextNodes[l] != nil && move.nextNodes[l].key < target {
 			// search to the right
-			current = current.nextNodes[l]
+			move = move.nextNodes[l]
 		}
 
-		if current.nextNodes[l] != nil && current.nextNodes[l].key == target {
+		if move.nextNodes[l] != nil && move.nextNodes[l].key == target {
 			// equal
-			return current.nextNodes[l]
+			return move.nextNodes[l]
 		}
 
 		// search down
 	}
-	// current.nextNodes[0] is ceil || current.nextNodes[0] == nil(tail node means ceil is not exist)
-	return current.nextNodes[0]
+	// move.nextNodes[0] is ceil || move.nextNodes[0] == nil(tail node means ceil is not exist)
+	return move.nextNodes[0]
 }
 
 func (sl *SkipList[O, T]) floor(target O) *node[O, T] {
@@ -279,22 +279,22 @@ func (sl *SkipList[O, T]) floor(target O) *node[O, T] {
 		return nil
 	}
 
-	current := sl.head
+	move := sl.head
 	for l := sl.Level() - 1; l >= 0; l-- {
-		for current.nextNodes[l] != nil && current.nextNodes[l].key < target {
+		for move.nextNodes[l] != nil && move.nextNodes[l].key < target {
 			// search to the right
-			current = current.nextNodes[l]
+			move = move.nextNodes[l]
 		}
 
-		if current.nextNodes[l] != nil && current.nextNodes[l].key == target {
+		if move.nextNodes[l] != nil && move.nextNodes[l].key == target {
 			// equal
-			return current.nextNodes[l]
+			return move.nextNodes[l]
 		}
 
 		// search down
 	}
-	// current is floor || current == sl.head(head node means floor is not exist)
-	return current
+	// move is floor || move == sl.head(head node means floor is not exist)
+	return move
 }
 
 func (sl *SkipList[O, T]) randLevel() int32 {
