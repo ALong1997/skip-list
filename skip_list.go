@@ -9,7 +9,6 @@ import (
 )
 
 type (
-	// SkipList is not thread-safe.
 	SkipList[O constraints.Ordered, T any] struct {
 		level, maxLevel, cap int32
 
